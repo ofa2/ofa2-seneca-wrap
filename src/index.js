@@ -81,7 +81,10 @@ export function wrapRoutes() {
         }
       }
 
-      return actionMethod(msg)
+      return Promise.resolve()
+        .then(() => {
+          return actionMethod(msg);
+        })
         .then((result) => {
           return done(null, result);
         })

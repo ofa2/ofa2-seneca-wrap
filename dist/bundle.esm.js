@@ -77,7 +77,9 @@ function wrapRoutes() {
         }
       }
 
-      return actionMethod(msg).then(result => {
+      return Promise.resolve().then(() => {
+        return actionMethod(msg);
+      }).then(result => {
         return done(null, result);
       }).catch(Errors, err => {
         logger.warn(err);
