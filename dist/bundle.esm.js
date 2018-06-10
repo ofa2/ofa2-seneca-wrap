@@ -21,12 +21,12 @@ function wrapAct() {
     }
 
     return act(msg, ...args).then(result => {
-      if (result && result.errcode) {
-        if (!Errors[result.errcode]) {
-          return Promise.reject(new Error(`no error code found ${result.errcode}`));
+      if (result && result.error && result.code) {
+        if (!Errors[result.code]) {
+          return Promise.reject(new Error(`no error code found ${result.code} for ${result.error}`));
         }
 
-        return Promise.reject(new Errors[result.errcode]());
+        return Promise.reject(new Errors[result.code]());
       }
 
       return result;
@@ -39,7 +39,7 @@ function wrapRoutes() {
   }
 
   this.seneca.plainMsg = function plainMsg(msg) {
-    return _.omit(msg, ['cmd', 'action', 'role', 'transport$', 'id$', 'plugin$', 'fatal$', 'tx$', 'meta$']);
+    return _.omit(msg, ['cmd', 'action', 'role', 'transport$', 'id$', 'plugin$', 'fatal$', 'tx$', 'meta$', 'traceId']);
   };
 
   _.forEach(this.config.routes, (action, key) => {
@@ -72,8 +72,6 @@ function wrapRoutes() {
       } = msg;
 
       if (traceId) {
-        delete msg.traceId;
-
         if (global.als) {
           global.als.set('traceId', traceId);
         }
@@ -81,12 +79,12 @@ function wrapRoutes() {
 
       return actionMethod(msg).then(result => {
         return done(null, result);
-      }).catch(Errors.OperationalError, err => {
+      }).catch(Errors, err => {
         logger.warn(err);
         done(null, err.response());
       }).catch(err => {
         logger.error(err);
-        done(null, new Errors.InternalError().response());
+        done(null, new Errors.Unknown().response());
       });
     };
   });

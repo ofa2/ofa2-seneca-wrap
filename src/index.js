@@ -19,12 +19,12 @@ export function wrapAct() {
     }
 
     return act(msg, ...args).then((result) => {
-      if (result && result.errcode) {
-        if (!Errors[result.errcode]) {
-          return Promise.reject(new Error(`no error code found ${result.errcode}`));
+      if (result && result.error && result.code) {
+        if (!Errors[result.code]) {
+          return Promise.reject(new Error(`no error code found ${result.code} for ${result.error}`));
         }
 
-        return Promise.reject(new Errors[result.errcode]());
+        return Promise.reject(new Errors[result.code]());
       }
       return result;
     });
@@ -47,6 +47,7 @@ export function wrapRoutes() {
       'fatal$',
       'tx$',
       'meta$',
+      'traceId',
     ]);
   };
 
@@ -75,7 +76,6 @@ export function wrapRoutes() {
     controller[actionMethodName] = function actionAsync(msg, done) {
       let { traceId } = msg;
       if (traceId) {
-        delete msg.traceId;
         if (global.als) {
           global.als.set('traceId', traceId);
         }
@@ -85,13 +85,13 @@ export function wrapRoutes() {
         .then((result) => {
           return done(null, result);
         })
-        .catch(Errors.OperationalError, (err) => {
+        .catch(Errors, (err) => {
           logger.warn(err);
           done(null, err.response());
         })
         .catch((err) => {
           logger.error(err);
-          done(null, new Errors.InternalError().response());
+          done(null, new Errors.Unknown().response());
         });
     };
   });
