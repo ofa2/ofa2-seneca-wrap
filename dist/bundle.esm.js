@@ -14,8 +14,13 @@ function wrapAct() {
     context: this.seneca
   }); // expose global promise act
 
-  global.act = async function actAsync(...args) {
-    return act(...args).then(result => {
+  global.act = async function actAsync(msg, ...args) {
+    if (global.als) {
+      let traceId = global.als.get('traceId');
+      msg.traceId = msg.traceId === undefined ? traceId : msg.traceId;
+    }
+
+    return act(msg, ...args).then(result => {
       if (result && result.errcode) {
         if (!Errors[result.errcode]) {
           return Promise.reject(new Error(`no error code found ${result.errcode}`));
