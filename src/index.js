@@ -19,12 +19,12 @@ export function wrapAct() {
     }
 
     return act(msg, ...args).then((result) => {
-      if (result && result.error && result.code) {
-        if (!Errors[result.code]) {
-          return Promise.reject(new Error(`no error code found ${result.code} for ${result.error}`));
+      if (result && result.error && result.code && result.name) {
+        if (!Errors[result.name]) {
+          return Promise.reject(new Error(`no error name found ${result.name} for ${result.error}`));
         }
 
-        return Promise.reject(new Errors[result.code]());
+        return Promise.reject(new Errors[result.name]());
       }
       return result;
     });
