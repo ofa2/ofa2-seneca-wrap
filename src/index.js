@@ -9,6 +9,7 @@ export function wrapAct() {
   if (!global.Errors) {
     throw new Error('no global Errors found');
   }
+
   let act = Promise.promisify(this.seneca.act, { context: this.seneca });
 
   // expose global promise act
@@ -18,16 +19,14 @@ export function wrapAct() {
       msg.traceId = msg.traceId === undefined ? traceId : msg.traceId;
     }
 
-    return act(msg, ...args).then((result) => {
-      if (result && result.error && result.code && result.name) {
-        if (!Errors[result.name]) {
-          return Promise.reject(new Error(`no error name found ${result.name} for ${result.error}`));
-        }
-
-        return Promise.reject(new Errors[result.name]());
+    let result = await act(msg, ...args);
+    if (result && result.errcode) {
+      if (!Errors[result.errcode]) {
+        throw new Error(`no error name found ${result.errcode} for ${result.errmsg}`);
       }
-      return result;
-    });
+      throw new Errors[result.errcode]();
+    }
+    return result;
   };
 }
 
@@ -88,7 +87,7 @@ export function wrapRoutes() {
         .then((result) => {
           return done(null, result);
         })
-        .catch(Errors, (err) => {
+        .catch(Errors.OperationalError, (err) => {
           logger.warn(err);
           done(null, err.response());
         })
