@@ -26,17 +26,17 @@ function wrapAct() {
       msg.traceId = msg.traceId === undefined ? traceId : msg.traceId;
     }
 
-    return act(msg, ...args).then(result => {
-      if (result && result.error && result.code && result.name) {
-        if (!Errors[result.name]) {
-          return Promise.reject(new Error(`no error name found ${result.name} for ${result.error}`));
-        }
+    let result = await act(msg, ...args);
 
-        return Promise.reject(new Errors[result.name]());
+    if (result && result.errcode) {
+      if (!Errors[result.errcode]) {
+        throw new Error(`no error name found ${result.errcode} for ${result.errmsg}`);
       }
 
-      return result;
-    });
+      throw new Errors[result.errcode](result.extra);
+    }
+
+    return result;
   };
 }
 function wrapRoutes() {
@@ -87,7 +87,7 @@ function wrapRoutes() {
         return actionMethod(msg);
       }).then(result => {
         return done(null, result);
-      }).catch(Errors, err => {
+      }).catch(Errors.OperationalError, err => {
         logger.warn(err);
         done(null, err.response());
       }).catch(err => {

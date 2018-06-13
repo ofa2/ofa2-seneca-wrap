@@ -24,7 +24,7 @@ export function wrapAct() {
       if (!Errors[result.errcode]) {
         throw new Error(`no error name found ${result.errcode} for ${result.errmsg}`);
       }
-      throw new Errors[result.errcode]();
+      throw new Errors[result.errcode](result.extra);
     }
     return result;
   };
