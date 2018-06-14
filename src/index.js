@@ -1,6 +1,55 @@
 import _ from 'lodash';
 import Promise from 'bluebird';
 
+function plainMsg(msg) {
+  return _.omit(msg, [
+    'cmd',
+    'action',
+    'role',
+    'transport$',
+    'id$',
+    'plugin$',
+    'fatal$',
+    'tx$',
+    'meta$',
+    'traceId',
+  ]);
+}
+
+function logRequest(type, level, msg) {
+  if (type === true) {
+    logger[level](msg.cmd);
+  }
+  else if (type === 'all') {
+    logger[level](msg);
+  }
+  else if (type === 'plain') {
+    logger[level](msg.cmd, plainMsg(msg));
+  }
+}
+
+function logResponse(start, type, level, msg, result) {
+  let ms = Date.now() - start;
+
+  if (result instanceof Errors.OperationalError) {
+    result.seneca = plainMsg(msg);
+    result.seneca.cmd = msg.cmd;
+    result.seneca.costMs = ms;
+    logger.warn(result);
+  }
+  else if (result instanceof Error) {
+    result.seneca = msg;
+    result.seneca.costMs = ms;
+    logger.error(result);
+  }
+  else if (type === true) {
+    logger[level](`done ${msg.cmd} -- ${ms}ms`);
+  }
+  else if (type === 'plain') {
+    logger[level](`done ${msg.cmd} -- ${ms}ms`, result);
+  }
+}
+
 export function wrapAct() {
   if (!this.seneca) {
     throw new Error('no seneca found');
@@ -35,20 +84,7 @@ export function wrapRoutes() {
     throw new Error('no seneca found');
   }
 
-  this.seneca.plainMsg = function plainMsg(msg) {
-    return _.omit(msg, [
-      'cmd',
-      'action',
-      'role',
-      'transport$',
-      'id$',
-      'plugin$',
-      'fatal$',
-      'tx$',
-      'meta$',
-      'traceId',
-    ]);
-  };
+  this.seneca.plainMsg = plainMsg;
 
   _.forEach(this.config.routes, (action, key) => {
     let index = key.indexOf(' ');
@@ -72,6 +108,9 @@ export function wrapRoutes() {
       throw new Error(`undefined action method: ${action}`);
     }
 
+    let { requestLog, requestLogLevel = 'trace' } = this.config.seneca;
+    let { responseLog, responseLogLevel = 'trace' } = this.config.seneca;
+
     controller[actionMethodName] = function actionAsync(msg, done) {
       let { traceId } = msg;
       if (traceId) {
@@ -80,19 +119,23 @@ export function wrapRoutes() {
         }
       }
 
+      const start = Date.now();
+      logRequest(requestLog, requestLogLevel, msg);
+
       return Promise.resolve()
         .then(() => {
           return actionMethod(msg);
         })
         .then((result) => {
+          logResponse(start, responseLog, responseLogLevel, msg, result);
           return done(null, result);
         })
         .catch(Errors.OperationalError, (err) => {
-          logger.warn(err);
+          logResponse(start, responseLog, responseLogLevel, msg, err);
           done(null, err.response());
         })
         .catch((err) => {
-          logger.error(err);
+          logResponse(start, responseLog, responseLogLevel, msg, err);
           done(null, new Errors.Unknown().response());
         });
     };
